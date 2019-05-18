@@ -95,7 +95,6 @@ class DBWNode(object):
             rate.sleep()
 
     def dbw_enabled_cb(self, msg):
-        rospy.logwarn("DEBUG {}".format(type(msg)))
         self.dbw_enabled = msg.data
 
     def twist_cmd_cb(self, msg):
