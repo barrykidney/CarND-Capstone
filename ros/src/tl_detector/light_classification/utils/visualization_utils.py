@@ -14,17 +14,12 @@
 # ==============================================================================
 
 """A set of functions that are used for visualization.
-
 These functions often receive an image, perform some visualization on the image.
 The functions do not return a value, instead they modify the image itself.
-
 """
-import abc
 import collections
 import functools
-# Set headless-friendly backend.
-import matplotlib; matplotlib.use('Agg')  # pylint: disable=multiple-statements
-import matplotlib.pyplot as plt  # pylint: disable=g-import-not-at-top
+import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image as Image
 import PIL.ImageColor as ImageColor
@@ -33,8 +28,6 @@ import PIL.ImageFont as ImageFont
 import six
 import tensorflow as tf
 
-from object_detection.core import standard_fields as fields
-from object_detection.utils import shape_utils
 
 _TITLE_LEFT_MARGIN = 10
 _TITLE_TOP_MARGIN = 10
@@ -67,7 +60,6 @@ STANDARD_COLORS = [
 
 def save_image_array_as_png(image, output_path):
   """Saves an image (represented as a numpy array) to PNG.
-
   Args:
     image: a numpy array with shape [height, width, 3].
     output_path: path to which image should be written.
@@ -79,10 +71,8 @@ def save_image_array_as_png(image, output_path):
 
 def encode_image_array_as_png_str(image):
   """Encodes a numpy array into a PNG string.
-
   Args:
     image: a numpy array with shape [height, width, 3].
-
   Returns:
     PNG encoded image string.
   """
@@ -104,13 +94,9 @@ def draw_bounding_box_on_image_array(image,
                                      display_str_list=(),
                                      use_normalized_coordinates=True):
   """Adds a bounding box to an image (numpy array).
-
-  Bounding box coordinates can be specified in either absolute (pixel) or
-  normalized coordinates by setting the use_normalized_coordinates argument.
-
   Args:
     image: a numpy array with shape [height, width, 3].
-    ymin: ymin of bounding box.
+    ymin: ymin of bounding box in normalized coordinates (same below).
     xmin: xmin of bounding box.
     ymax: ymax of bounding box.
     xmax: xmax of bounding box.
@@ -139,15 +125,10 @@ def draw_bounding_box_on_image(image,
                                display_str_list=(),
                                use_normalized_coordinates=True):
   """Adds a bounding box to an image.
-
-  Bounding box coordinates can be specified in either absolute (pixel) or
-  normalized coordinates by setting the use_normalized_coordinates argument.
-
   Each string in display_str_list is displayed on a separate line above the
   bounding box in black text on a rectangle filled with the input 'color'.
   If the top of the bounding box extends to the edge of the image, the strings
   are displayed below the bounding box.
-
   Args:
     image: a PIL.Image object.
     ymin: ymin of bounding box.
@@ -209,7 +190,6 @@ def draw_bounding_boxes_on_image_array(image,
                                        thickness=4,
                                        display_str_list_list=()):
   """Draws bounding boxes on image (numpy array).
-
   Args:
     image: a numpy array object.
     boxes: a 2 dimensional numpy array of [N, 4]: (ymin, xmin, ymax, xmax).
@@ -221,7 +201,6 @@ def draw_bounding_boxes_on_image_array(image,
                            The reason to pass a list of strings for a
                            bounding box is that it might contain
                            multiple labels.
-
   Raises:
     ValueError: if boxes is not a [N, 4] array
   """
@@ -237,7 +216,6 @@ def draw_bounding_boxes_on_image(image,
                                  thickness=4,
                                  display_str_list_list=()):
   """Draws bounding boxes on image.
-
   Args:
     image: a PIL.Image object.
     boxes: a 2 dimensional numpy array of [N, 4]: (ymin, xmin, ymax, xmax).
@@ -249,7 +227,6 @@ def draw_bounding_boxes_on_image(image,
                            The reason to pass a list of strings for a
                            bounding box is that it might contain
                            multiple labels.
-
   Raises:
     ValueError: if boxes is not a [N, 4] array
   """
@@ -266,274 +243,50 @@ def draw_bounding_boxes_on_image(image,
                                boxes[i, 3], color, thickness, display_str_list)
 
 
-def _visualize_boxes(image, boxes, classes, scores, category_index, **kwargs):
-  return visualize_boxes_and_labels_on_image_array(
-      image, boxes, classes, scores, category_index=category_index, **kwargs)
-
-
-def _visualize_boxes_and_masks(image, boxes, classes, scores, masks,
-                               category_index, **kwargs):
-  return visualize_boxes_and_labels_on_image_array(
-      image,
-      boxes,
-      classes,
-      scores,
-      category_index=category_index,
-      instance_masks=masks,
-      **kwargs)
-
-
-def _visualize_boxes_and_keypoints(image, boxes, classes, scores, keypoints,
-                                   category_index, **kwargs):
-  return visualize_boxes_and_labels_on_image_array(
-      image,
-      boxes,
-      classes,
-      scores,
-      category_index=category_index,
-      keypoints=keypoints,
-      **kwargs)
-
-
-def _visualize_boxes_and_masks_and_keypoints(
-    image, boxes, classes, scores, masks, keypoints, category_index, **kwargs):
-  return visualize_boxes_and_labels_on_image_array(
-      image,
-      boxes,
-      classes,
-      scores,
-      category_index=category_index,
-      instance_masks=masks,
-      keypoints=keypoints,
-      **kwargs)
-
-
-def _resize_original_image(image, image_shape):
-  image = tf.expand_dims(image, 0)
-  image = tf.image.resize_images(
-      image,
-      image_shape,
-      method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-      align_corners=True)
-  return tf.cast(tf.squeeze(image, 0), tf.uint8)
-
-
 def draw_bounding_boxes_on_image_tensors(images,
                                          boxes,
                                          classes,
                                          scores,
                                          category_index,
-                                         original_image_spatial_shape=None,
-                                         true_image_shape=None,
-                                         instance_masks=None,
-                                         keypoints=None,
                                          max_boxes_to_draw=20,
-                                         min_score_thresh=0.2,
-                                         use_normalized_coordinates=True):
-  """Draws bounding boxes, masks, and keypoints on batch of image tensors.
-
+                                         min_score_thresh=0.2):
+  """Draws bounding boxes on batch of image tensors.
   Args:
-    images: A 4D uint8 image tensor of shape [N, H, W, C]. If C > 3, additional
-      channels will be ignored. If C = 1, then we convert the images to RGB
-      images.
+    images: A 4D uint8 image tensor of shape [N, H, W, C].
     boxes: [N, max_detections, 4] float32 tensor of detection boxes.
     classes: [N, max_detections] int tensor of detection classes. Note that
       classes are 1-indexed.
     scores: [N, max_detections] float32 tensor of detection scores.
     category_index: a dict that maps integer ids to category dicts. e.g.
       {1: {1: 'dog'}, 2: {2: 'cat'}, ...}
-    original_image_spatial_shape: [N, 2] tensor containing the spatial size of
-      the original image.
-    true_image_shape: [N, 3] tensor containing the spatial size of unpadded
-      original_image.
-    instance_masks: A 4D uint8 tensor of shape [N, max_detection, H, W] with
-      instance masks.
-    keypoints: A 4D float32 tensor of shape [N, max_detection, num_keypoints, 2]
-      with keypoints.
     max_boxes_to_draw: Maximum number of boxes to draw on an image. Default 20.
     min_score_thresh: Minimum score threshold for visualization. Default 0.2.
-    use_normalized_coordinates: Whether to assume boxes and kepoints are in
-      normalized coordinates (as opposed to absolute coordiantes).
-      Default is True.
-
   Returns:
     4D image tensor of type uint8, with boxes drawn on top.
   """
-  # Additional channels are being ignored.
-  if images.shape[3] > 3:
-    images = images[:, :, :, 0:3]
-  elif images.shape[3] == 1:
-    images = tf.image.grayscale_to_rgb(images)
-  visualization_keyword_args = {
-      'use_normalized_coordinates': use_normalized_coordinates,
-      'max_boxes_to_draw': max_boxes_to_draw,
-      'min_score_thresh': min_score_thresh,
-      'agnostic_mode': False,
-      'line_thickness': 4
-  }
-  if true_image_shape is None:
-    true_shapes = tf.constant(-1, shape=[images.shape.as_list()[0], 3])
-  else:
-    true_shapes = true_image_shape
-  if original_image_spatial_shape is None:
-    original_shapes = tf.constant(-1, shape=[images.shape.as_list()[0], 2])
-  else:
-    original_shapes = original_image_spatial_shape
+  visualize_boxes_fn = functools.partial(
+      visualize_boxes_and_labels_on_image_array,
+      category_index=category_index,
+      instance_masks=None,
+      keypoints=None,
+      use_normalized_coordinates=True,
+      max_boxes_to_draw=max_boxes_to_draw,
+      min_score_thresh=min_score_thresh,
+      agnostic_mode=False,
+      line_thickness=4)
 
-  if instance_masks is not None and keypoints is None:
-    visualize_boxes_fn = functools.partial(
-        _visualize_boxes_and_masks,
-        category_index=category_index,
-        **visualization_keyword_args)
-    elems = [
-        true_shapes, original_shapes, images, boxes, classes, scores,
-        instance_masks
-    ]
-  elif instance_masks is None and keypoints is not None:
-    visualize_boxes_fn = functools.partial(
-        _visualize_boxes_and_keypoints,
-        category_index=category_index,
-        **visualization_keyword_args)
-    elems = [
-        true_shapes, original_shapes, images, boxes, classes, scores, keypoints
-    ]
-  elif instance_masks is not None and keypoints is not None:
-    visualize_boxes_fn = functools.partial(
-        _visualize_boxes_and_masks_and_keypoints,
-        category_index=category_index,
-        **visualization_keyword_args)
-    elems = [
-        true_shapes, original_shapes, images, boxes, classes, scores,
-        instance_masks, keypoints
-    ]
-  else:
-    visualize_boxes_fn = functools.partial(
-        _visualize_boxes,
-        category_index=category_index,
-        **visualization_keyword_args)
-    elems = [
-        true_shapes, original_shapes, images, boxes, classes, scores
-    ]
-
-  def draw_boxes(image_and_detections):
+  def draw_boxes(image_boxes_classes_scores):
     """Draws boxes on image."""
-    true_shape = image_and_detections[0]
-    original_shape = image_and_detections[1]
-    if true_image_shape is not None:
-      image = shape_utils.pad_or_clip_nd(image_and_detections[2],
-                                         [true_shape[0], true_shape[1], 3])
-    if original_image_spatial_shape is not None:
-      image_and_detections[2] = _resize_original_image(image, original_shape)
-
-    image_with_boxes = tf.py_func(visualize_boxes_fn, image_and_detections[2:],
-                                  tf.uint8)
+    (image, boxes, classes, scores) = image_boxes_classes_scores
+    image_with_boxes = tf.py_func(visualize_boxes_fn,
+                                  [image, boxes, classes, scores], tf.uint8)
     return image_with_boxes
 
-  images = tf.map_fn(draw_boxes, elems, dtype=tf.uint8, back_prop=False)
+  images = tf.map_fn(
+      draw_boxes, (images, boxes, classes, scores),
+      dtype=tf.uint8,
+      back_prop=False)
   return images
-
-
-def draw_side_by_side_evaluation_image(eval_dict,
-                                       category_index,
-                                       max_boxes_to_draw=20,
-                                       min_score_thresh=0.2,
-                                       use_normalized_coordinates=True):
-  """Creates a side-by-side image with detections and groundtruth.
-
-  Bounding boxes (and instance masks, if available) are visualized on both
-  subimages.
-
-  Args:
-    eval_dict: The evaluation dictionary returned by
-      eval_util.result_dict_for_batched_example() or
-      eval_util.result_dict_for_single_example().
-    category_index: A category index (dictionary) produced from a labelmap.
-    max_boxes_to_draw: The maximum number of boxes to draw for detections.
-    min_score_thresh: The minimum score threshold for showing detections.
-    use_normalized_coordinates: Whether to assume boxes and kepoints are in
-      normalized coordinates (as opposed to absolute coordiantes).
-      Default is True.
-
-  Returns:
-    A list of [1, H, 2 * W, C] uint8 tensor. The subimage on the left
-      corresponds to detections, while the subimage on the right corresponds to
-      groundtruth.
-  """
-  detection_fields = fields.DetectionResultFields()
-  input_data_fields = fields.InputDataFields()
-
-  images_with_detections_list = []
-
-  # Add the batch dimension if the eval_dict is for single example.
-  if len(eval_dict[detection_fields.detection_classes].shape) == 1:
-    for key in eval_dict:
-      if key != input_data_fields.original_image:
-        eval_dict[key] = tf.expand_dims(eval_dict[key], 0)
-
-  for indx in range(eval_dict[input_data_fields.original_image].shape[0]):
-    instance_masks = None
-    if detection_fields.detection_masks in eval_dict:
-      instance_masks = tf.cast(
-          tf.expand_dims(
-              eval_dict[detection_fields.detection_masks][indx], axis=0),
-          tf.uint8)
-    keypoints = None
-    if detection_fields.detection_keypoints in eval_dict:
-      keypoints = tf.expand_dims(
-          eval_dict[detection_fields.detection_keypoints][indx], axis=0)
-    groundtruth_instance_masks = None
-    if input_data_fields.groundtruth_instance_masks in eval_dict:
-      groundtruth_instance_masks = tf.cast(
-          tf.expand_dims(
-              eval_dict[input_data_fields.groundtruth_instance_masks][indx],
-              axis=0), tf.uint8)
-
-    images_with_detections = draw_bounding_boxes_on_image_tensors(
-        tf.expand_dims(
-            eval_dict[input_data_fields.original_image][indx], axis=0),
-        tf.expand_dims(
-            eval_dict[detection_fields.detection_boxes][indx], axis=0),
-        tf.expand_dims(
-            eval_dict[detection_fields.detection_classes][indx], axis=0),
-        tf.expand_dims(
-            eval_dict[detection_fields.detection_scores][indx], axis=0),
-        category_index,
-        original_image_spatial_shape=tf.expand_dims(
-            eval_dict[input_data_fields.original_image_spatial_shape][indx],
-            axis=0),
-        true_image_shape=tf.expand_dims(
-            eval_dict[input_data_fields.true_image_shape][indx], axis=0),
-        instance_masks=instance_masks,
-        keypoints=keypoints,
-        max_boxes_to_draw=max_boxes_to_draw,
-        min_score_thresh=min_score_thresh,
-        use_normalized_coordinates=use_normalized_coordinates)
-    images_with_groundtruth = draw_bounding_boxes_on_image_tensors(
-        tf.expand_dims(
-            eval_dict[input_data_fields.original_image][indx], axis=0),
-        tf.expand_dims(
-            eval_dict[input_data_fields.groundtruth_boxes][indx], axis=0),
-        tf.expand_dims(
-            eval_dict[input_data_fields.groundtruth_classes][indx], axis=0),
-        tf.expand_dims(
-            tf.ones_like(
-                eval_dict[input_data_fields.groundtruth_classes][indx],
-                dtype=tf.float32),
-            axis=0),
-        category_index,
-        original_image_spatial_shape=tf.expand_dims(
-            eval_dict[input_data_fields.original_image_spatial_shape][indx],
-            axis=0),
-        true_image_shape=tf.expand_dims(
-            eval_dict[input_data_fields.true_image_shape][indx], axis=0),
-        instance_masks=groundtruth_instance_masks,
-        keypoints=None,
-        max_boxes_to_draw=None,
-        min_score_thresh=0.0,
-        use_normalized_coordinates=use_normalized_coordinates)
-    images_with_detections_list.append(
-        tf.concat([images_with_detections, images_with_groundtruth], axis=2))
-  return images_with_detections_list
 
 
 def draw_keypoints_on_image_array(image,
@@ -542,7 +295,6 @@ def draw_keypoints_on_image_array(image,
                                   radius=2,
                                   use_normalized_coordinates=True):
   """Draws keypoints on an image (numpy array).
-
   Args:
     image: a numpy array with shape [height, width, 3].
     keypoints: a numpy array with shape [num_keypoints, 2].
@@ -563,7 +315,6 @@ def draw_keypoints_on_image(image,
                             radius=2,
                             use_normalized_coordinates=True):
   """Draws keypoints on an image.
-
   Args:
     image: a PIL.Image object.
     keypoints: a numpy array with shape [num_keypoints, 2].
@@ -585,16 +336,14 @@ def draw_keypoints_on_image(image,
                  outline=color, fill=color)
 
 
-def draw_mask_on_image_array(image, mask, color='red', alpha=0.4):
+def draw_mask_on_image_array(image, mask, color='red', alpha=0.7):
   """Draws mask on an image.
-
   Args:
     image: uint8 numpy array with shape (img_height, img_height, 3)
     mask: a uint8 numpy array of shape (img_height, img_height) with
       values between either 0 or 1.
     color: color to draw the keypoints with. Default is red.
-    alpha: transparency value between 0 and 1. (default: 0.4)
-
+    alpha: transparency value between 0 and 1. (default: 0.7)
   Raises:
     ValueError: On incorrect data type for image or masks.
   """
@@ -604,9 +353,6 @@ def draw_mask_on_image_array(image, mask, color='red', alpha=0.4):
     raise ValueError('`mask` not of type np.uint8')
   if np.any(np.logical_and(mask != 1, mask != 0)):
     raise ValueError('`mask` elements should be in [0, 1]')
-  if image.shape[:2] != mask.shape:
-    raise ValueError('The image has spatial dimensions %s but the mask has '
-                     'dimensions %s' % (image.shape[:2], mask.shape))
   rgb = ImageColor.getrgb(color)
   pil_image = Image.fromarray(image)
 
@@ -618,30 +364,23 @@ def draw_mask_on_image_array(image, mask, color='red', alpha=0.4):
   np.copyto(image, np.array(pil_image.convert('RGB')))
 
 
-def visualize_boxes_and_labels_on_image_array(
-    image,
-    boxes,
-    classes,
-    scores,
-    category_index,
-    instance_masks=None,
-    instance_boundaries=None,
-    keypoints=None,
-    use_normalized_coordinates=False,
-    max_boxes_to_draw=20,
-    min_score_thresh=.5,
-    agnostic_mode=False,
-    line_thickness=4,
-    groundtruth_box_visualization_color='black',
-    skip_scores=False,
-    skip_labels=False):
+def visualize_boxes_and_labels_on_image_array(image,
+                                              boxes,
+                                              classes,
+                                              scores,
+                                              category_index,
+                                              instance_masks=None,
+                                              keypoints=None,
+                                              use_normalized_coordinates=False,
+                                              max_boxes_to_draw=20,
+                                              min_score_thresh=.5,
+                                              agnostic_mode=False,
+                                              line_thickness=4):
   """Overlay labeled boxes on an image with formatted scores and label names.
-
   This function groups boxes that correspond to the same location
   and creates a display string for each detection and overlays these
   on the image. Note that this function modifies the image in place, and returns
   that same image.
-
   Args:
     image: uint8 numpy array with shape (img_height, img_width, 3)
     boxes: a numpy array of shape [N, 4]
@@ -652,10 +391,8 @@ def visualize_boxes_and_labels_on_image_array(
       boxes and plot all boxes as black with no classes or scores.
     category_index: a dict containing category dictionaries (each holding
       category index `id` and category name `name`) keyed by category indices.
-    instance_masks: a numpy array of shape [N, image_height, image_width] with
-      values ranging between 0 and 1, can be None.
-    instance_boundaries: a numpy array of shape [N, image_height, image_width]
-      with values ranging between 0 and 1, can be None.
+    instance_masks: a numpy array of shape [N, image_height, image_width], can
+      be None
     keypoints: a numpy array of shape [N, num_keypoints, 2], can
       be None
     use_normalized_coordinates: whether boxes is to be interpreted as
@@ -667,11 +404,6 @@ def visualize_boxes_and_labels_on_image_array(
       class-agnostic mode or not.  This mode will display scores but ignore
       classes.
     line_thickness: integer (default: 4) controlling line width of the boxes.
-    groundtruth_box_visualization_color: box color for visualizing groundtruth
-      boxes
-    skip_scores: whether to skip score when drawing a single detection
-    skip_labels: whether to skip label when drawing a single detection
-
   Returns:
     uint8 numpy array with shape (img_height, img_width, 3) with overlaid boxes.
   """
@@ -680,7 +412,6 @@ def visualize_boxes_and_labels_on_image_array(
   box_to_display_str_map = collections.defaultdict(list)
   box_to_color_map = collections.defaultdict(str)
   box_to_instance_masks_map = {}
-  box_to_instance_boundaries_map = {}
   box_to_keypoints_map = collections.defaultdict(list)
   if not max_boxes_to_draw:
     max_boxes_to_draw = boxes.shape[0]
@@ -689,26 +420,21 @@ def visualize_boxes_and_labels_on_image_array(
       box = tuple(boxes[i].tolist())
       if instance_masks is not None:
         box_to_instance_masks_map[box] = instance_masks[i]
-      if instance_boundaries is not None:
-        box_to_instance_boundaries_map[box] = instance_boundaries[i]
       if keypoints is not None:
         box_to_keypoints_map[box].extend(keypoints[i])
       if scores is None:
-        box_to_color_map[box] = groundtruth_box_visualization_color
+        box_to_color_map[box] = 'black'
       else:
-        display_str = ''
-        if not skip_labels:
-          if not agnostic_mode:
-            if classes[i] in category_index.keys():
-              class_name = category_index[classes[i]]['name']
-            else:
-              class_name = 'N/A'
-            display_str = str(class_name)
-        if not skip_scores:
-          if not display_str:
-            display_str = '{}%'.format(int(100*scores[i]))
+        if not agnostic_mode:
+          if classes[i] in category_index.keys():
+            class_name = category_index[classes[i]]['name']
           else:
-            display_str = '{}: {}%'.format(display_str, int(100*scores[i]))
+            class_name = 'N/A'
+          display_str = '{}: {}%'.format(
+              class_name,
+              int(100*scores[i]))
+        else:
+          display_str = 'score: {}%'.format(int(100 * scores[i]))
         box_to_display_str_map[box].append(display_str)
         if agnostic_mode:
           box_to_color_map[box] = 'DarkOrange'
@@ -724,13 +450,6 @@ def visualize_boxes_and_labels_on_image_array(
           image,
           box_to_instance_masks_map[box],
           color=color
-      )
-    if instance_boundaries is not None:
-      draw_mask_on_image_array(
-          image,
-          box_to_instance_boundaries_map[box],
-          color='red',
-          alpha=1.0
       )
     draw_bounding_box_on_image_array(
         image,
@@ -755,10 +474,8 @@ def visualize_boxes_and_labels_on_image_array(
 
 def add_cdf_image_summary(values, name):
   """Adds a tf.summary.image for a CDF plot of the values.
-
   Normalizes `values` such that they sum to 1, plots the cumulative distribution
   function and creates a tf image summary.
-
   Args:
     values: a 1-D float32 tensor containing the values.
     name: name for the image summary.
@@ -778,197 +495,7 @@ def add_cdf_image_summary(values, name):
     fig.canvas.draw()
     width, height = fig.get_size_inches() * fig.get_dpi()
     image = np.fromstring(fig.canvas.tostring_rgb(), dtype='uint8').reshape(
-        1, int(height), int(width), 3)
+        1, height, width, 3)
     return image
   cdf_plot = tf.py_func(cdf_plot, [values], tf.uint8)
   tf.summary.image(name, cdf_plot)
-
-
-def add_hist_image_summary(values, bins, name):
-  """Adds a tf.summary.image for a histogram plot of the values.
-
-  Plots the histogram of values and creates a tf image summary.
-
-  Args:
-    values: a 1-D float32 tensor containing the values.
-    bins: bin edges which will be directly passed to np.histogram.
-    name: name for the image summary.
-  """
-
-  def hist_plot(values, bins):
-    """Numpy function to plot hist."""
-    fig = plt.figure(frameon=False)
-    ax = fig.add_subplot('111')
-    y, x = np.histogram(values, bins=bins)
-    ax.plot(x[:-1], y)
-    ax.set_ylabel('count')
-    ax.set_xlabel('value')
-    fig.canvas.draw()
-    width, height = fig.get_size_inches() * fig.get_dpi()
-    image = np.fromstring(
-        fig.canvas.tostring_rgb(), dtype='uint8').reshape(
-            1, int(height), int(width), 3)
-    return image
-  hist_plot = tf.py_func(hist_plot, [values, bins], tf.uint8)
-  tf.summary.image(name, hist_plot)
-
-
-class EvalMetricOpsVisualization(object):
-  """Abstract base class responsible for visualizations during evaluation.
-
-  Currently, summary images are not run during evaluation. One way to produce
-  evaluation images in Tensorboard is to provide tf.summary.image strings as
-  `value_ops` in tf.estimator.EstimatorSpec's `eval_metric_ops`. This class is
-  responsible for accruing images (with overlaid detections and groundtruth)
-  and returning a dictionary that can be passed to `eval_metric_ops`.
-  """
-  __metaclass__ = abc.ABCMeta
-
-  def __init__(self,
-               category_index,
-               max_examples_to_draw=5,
-               max_boxes_to_draw=20,
-               min_score_thresh=0.2,
-               use_normalized_coordinates=True,
-               summary_name_prefix='evaluation_image'):
-    """Creates an EvalMetricOpsVisualization.
-
-    Args:
-      category_index: A category index (dictionary) produced from a labelmap.
-      max_examples_to_draw: The maximum number of example summaries to produce.
-      max_boxes_to_draw: The maximum number of boxes to draw for detections.
-      min_score_thresh: The minimum score threshold for showing detections.
-      use_normalized_coordinates: Whether to assume boxes and kepoints are in
-        normalized coordinates (as opposed to absolute coordiantes).
-        Default is True.
-      summary_name_prefix: A string prefix for each image summary.
-    """
-
-    self._category_index = category_index
-    self._max_examples_to_draw = max_examples_to_draw
-    self._max_boxes_to_draw = max_boxes_to_draw
-    self._min_score_thresh = min_score_thresh
-    self._use_normalized_coordinates = use_normalized_coordinates
-    self._summary_name_prefix = summary_name_prefix
-    self._images = []
-
-  def clear(self):
-    self._images = []
-
-  def add_images(self, images):
-    """Store a list of images, each with shape [1, H, W, C]."""
-    if len(self._images) >= self._max_examples_to_draw:
-      return
-
-    # Store images and clip list if necessary.
-    self._images.extend(images)
-    if len(self._images) > self._max_examples_to_draw:
-      self._images[self._max_examples_to_draw:] = []
-
-  def get_estimator_eval_metric_ops(self, eval_dict):
-    """Returns metric ops for use in tf.estimator.EstimatorSpec.
-
-    Args:
-      eval_dict: A dictionary that holds an image, groundtruth, and detections
-        for a batched example. Note that, we use only the first example for
-        visualization. See eval_util.result_dict_for_batched_example() for a
-        convenient method for constructing such a dictionary. The dictionary
-        contains
-        fields.InputDataFields.original_image: [batch_size, H, W, 3] image.
-        fields.InputDataFields.original_image_spatial_shape: [batch_size, 2]
-          tensor containing the size of the original image.
-        fields.InputDataFields.true_image_shape: [batch_size, 3]
-          tensor containing the spatial size of the upadded original image.
-        fields.InputDataFields.groundtruth_boxes - [batch_size, num_boxes, 4]
-          float32 tensor with groundtruth boxes in range [0.0, 1.0].
-        fields.InputDataFields.groundtruth_classes - [batch_size, num_boxes]
-          int64 tensor with 1-indexed groundtruth classes.
-        fields.InputDataFields.groundtruth_instance_masks - (optional)
-          [batch_size, num_boxes, H, W] int64 tensor with instance masks.
-        fields.DetectionResultFields.detection_boxes - [batch_size,
-          max_num_boxes, 4] float32 tensor with detection boxes in range [0.0,
-          1.0].
-        fields.DetectionResultFields.detection_classes - [batch_size,
-          max_num_boxes] int64 tensor with 1-indexed detection classes.
-        fields.DetectionResultFields.detection_scores - [batch_size,
-          max_num_boxes] float32 tensor with detection scores.
-        fields.DetectionResultFields.detection_masks - (optional) [batch_size,
-          max_num_boxes, H, W] float32 tensor of binarized masks.
-        fields.DetectionResultFields.detection_keypoints - (optional)
-          [batch_size, max_num_boxes, num_keypoints, 2] float32 tensor with
-          keypoints.
-
-    Returns:
-      A dictionary of image summary names to tuple of (value_op, update_op). The
-      `update_op` is the same for all items in the dictionary, and is
-      responsible for saving a single side-by-side image with detections and
-      groundtruth. Each `value_op` holds the tf.summary.image string for a given
-      image.
-    """
-    if self._max_examples_to_draw == 0:
-      return {}
-    images = self.images_from_evaluation_dict(eval_dict)
-
-    def get_images():
-      """Returns a list of images, padded to self._max_images_to_draw."""
-      images = self._images
-      while len(images) < self._max_examples_to_draw:
-        images.append(np.array(0, dtype=np.uint8))
-      self.clear()
-      return images
-
-    def image_summary_or_default_string(summary_name, image):
-      """Returns image summaries for non-padded elements."""
-      return tf.cond(
-          tf.equal(tf.size(tf.shape(image)), 4),
-          lambda: tf.summary.image(summary_name, image),
-          lambda: tf.constant(''))
-
-    update_op = tf.py_func(self.add_images, [[images[0]]], [])
-    image_tensors = tf.py_func(
-        get_images, [], [tf.uint8] * self._max_examples_to_draw)
-    eval_metric_ops = {}
-    for i, image in enumerate(image_tensors):
-      summary_name = self._summary_name_prefix + '/' + str(i)
-      value_op = image_summary_or_default_string(summary_name, image)
-      eval_metric_ops[summary_name] = (value_op, update_op)
-    return eval_metric_ops
-
-  @abc.abstractmethod
-  def images_from_evaluation_dict(self, eval_dict):
-    """Converts evaluation dictionary into a list of image tensors.
-
-    To be overridden by implementations.
-
-    Args:
-      eval_dict: A dictionary with all the necessary information for producing
-        visualizations.
-
-    Returns:
-      A list of [1, H, W, C] uint8 tensors.
-    """
-    raise NotImplementedError
-
-
-class VisualizeSingleFrameDetections(EvalMetricOpsVisualization):
-  """Class responsible for single-frame object detection visualizations."""
-
-  def __init__(self,
-               category_index,
-               max_examples_to_draw=5,
-               max_boxes_to_draw=20,
-               min_score_thresh=0.2,
-               use_normalized_coordinates=True,
-               summary_name_prefix='Detections_Left_Groundtruth_Right'):
-    super(VisualizeSingleFrameDetections, self).__init__(
-        category_index=category_index,
-        max_examples_to_draw=max_examples_to_draw,
-        max_boxes_to_draw=max_boxes_to_draw,
-        min_score_thresh=min_score_thresh,
-        use_normalized_coordinates=use_normalized_coordinates,
-        summary_name_prefix=summary_name_prefix)
-
-  def images_from_evaluation_dict(self, eval_dict):
-    return draw_side_by_side_evaluation_image(
-        eval_dict, self._category_index, self._max_boxes_to_draw,
-        self._min_score_thresh, self._use_normalized_coordinates)
