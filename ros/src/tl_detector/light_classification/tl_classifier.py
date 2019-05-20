@@ -40,6 +40,8 @@ class TLClassifier(object):
 
         label_map_file_path = os.path.join(model_dir, 'label_map.pbtxt')
 
+        print (model_file_path)
+
         # Load Tensorflow model graph
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
