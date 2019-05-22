@@ -9,8 +9,10 @@ from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
 from scipy.spatial import KDTree
 import tf
-import cv2
 import yaml
+import os
+
+from light_classification.utils.imagesaver import ImageSaver
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -19,7 +21,10 @@ class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
 
-        self.use_classifier = False
+        self.create_dataset = False  # only to create datasets from the simulator
+        self.safe_visualizations = False  # saves camera images with detected bounding boxes
+        self.use_classifier = True  # use the traffic light detection
+        self.image_no = 0
 
         self.pose = None
         self.waypoints = None
@@ -47,12 +52,14 @@ class TLDetector(object):
 
         self.is_site = self.config['is_site']
 
+        output_dir = os.path.join('./data/dataset/', 'site' if self.is_site else 'simulator')
+        self.image_saver = ImageSaver(None, output_dir)
+
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
 
-        if self.use_classifier:
-            self.light_classifier = TLClassifier(True)  # True => save visualizations
+        self.light_classifier = TLClassifier(self.safe_visualizations)
 
         self.listener = tf.TransformListener()
 
@@ -137,7 +144,12 @@ class TLDetector(object):
         if not self.has_image:
             return False
 
-        if not self.use_classifier:
+        if self.create_dataset and self.image_no % 15 == 0:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, 'rgb8')
+            self.image_saver.save_image(cv_image, self.state_to_string(light.state))
+        self.image_no += 1
+
+        if not self.use_classifier or self.create_dataset:
             rospy.loginfo('Light state: %s', light.state)
             return light.state
 
@@ -154,12 +166,12 @@ class TLDetector(object):
     @staticmethod
     def state_to_string(state):
         if state == TrafficLight.RED:
-            return "RED"
+            return "Red"
         elif state == TrafficLight.YELLOW:
-            return "YELLOW"
+            return "Yellow"
         elif state == TrafficLight.GREEN:
-            return "GREEN"
-        return "UNKNOWN"
+            return "Green"
+        return "Unknown"
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
