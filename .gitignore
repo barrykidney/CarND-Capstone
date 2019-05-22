@@ -5,3 +5,6 @@ devel
 
 profile.tmp
 traffic_light_bag_file/
+
+# PyCharm
+.idea
