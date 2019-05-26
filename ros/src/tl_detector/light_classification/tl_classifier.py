@@ -40,8 +40,8 @@ class TLClassifier(object):
             output_dir = os.path.join(output_dir, 'simulator')
 
         # Load Tensorflow model graph
-        self.graph = tf.Graph()
-        with self.graph.as_default():
+        self.detection_graph = tf.Graph()
+        with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
             with tf.gfile.GFile(model_file_path, 'rb') as fid:
                 serialized_graph = fid.read()
@@ -59,18 +59,17 @@ class TLClassifier(object):
         self.image_saver = ImageSaver(self.category_index, output_dir)
 
     def detect_traffic_lights(self, image):
-        with self.graph.as_default():
-            with tf.Session(graph=self.graph) as sess:
-                image_tensor = self.graph.get_tensor_by_name('image_tensor:0')
-                boxes = self.graph.get_tensor_by_name('detection_boxes:0')
-                scores = self.graph.get_tensor_by_name('detection_scores:0')
-                classes = self.graph.get_tensor_by_name('detection_classes:0')
-                num_detections = self.graph.get_tensor_by_name('num_detections:0')
+        with self.detection_graph.as_default():
+            with tf.Session(graph=self.detection_graph) as sess:
+                image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
+                boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
+                scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
+                classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
+                num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
 
-                # images to have shape: [1, None, None, 3]
-                image_np_expanded = np.expand_dims(image, axis=0)
-                (boxes, scores, classes, num_detections) = sess.run([boxes, scores, classes, num_detections],
-                                                                    feed_dict={image_tensor: image_np_expanded})
+                (boxes, scores, classes, num_detections) = sess.run(
+                    [boxes, scores, classes, num_detections],
+                    feed_dict={image_tensor: np.expand_dims(image, axis=0)})
 
                 return boxes, scores, classes, num_detections
 
