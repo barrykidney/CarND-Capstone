@@ -94,12 +94,15 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        self.has_image = True
-        self.camera_image = msg
-        light_wp, state = self.process_traffic_lights()
-        # rospy.logwarn("DEBUG {}".format(type(msg)))
+        tl_in_range = self.traffic_light_in_range(500)
+        # rospy.logwarn("DEBUG: TL in range: {}".format(tl_in_range))
 
-        if self.image_count % 3 == 0:
+        if self.image_count % 3 == 0 and tl_in_range:
+            self.has_image = True
+            self.camera_image = msg
+            light_wp, state = self.process_traffic_lights()
+            # rospy.logwarn("DEBUG {}".format(type(msg)))
+            # rospy.logwarn("DEBUG: image_count: {}".format(self.image_count))
             '''
             Publish upcoming red lights at camera frequency.
             Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
@@ -119,6 +122,31 @@ class TLDetector(object):
             self.state_count += 1
 
         self.image_count += 1
+
+    def traffic_light_in_range(self, range_in_waypoints):
+
+        # List of positions that correspond to the line to stop in front of for a given intersection
+        stop_line_positions = self.config['stop_line_positions']
+        if self.pose and self.image_count % 3 == 0:
+            idx_of_closest_wp_to_car = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.x)
+
+            no_of_waypoints = len(self.waypoints.waypoints)
+            max_dist_to_tl = idx_of_closest_wp_to_car + range_in_waypoints
+
+            for i, light in enumerate(self.lights):
+                line = stop_line_positions[i]
+                idx_of_closest_wp_to_line = self.get_closest_waypoint(line[0], line[1])
+
+                if max_dist_to_tl > no_of_waypoints:
+                    if idx_of_closest_wp_to_car < idx_of_closest_wp_to_line or idx_of_closest_wp_to_line < max_dist_to_tl % no_of_waypoints:
+                        # rospy.logwarn("DEBUG: TL in range: TRUE")
+                        return True
+                else:
+                    if idx_of_closest_wp_to_car <= idx_of_closest_wp_to_line <= max_dist_to_tl % no_of_waypoints:
+                        # rospy.logwarn("DEBUG: TL in range: TRUE")
+                        return True
+                # rospy.logwarn("DEBUG: TL in range: FALSE")
+                return False
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
