@@ -6,6 +6,14 @@ from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped
 import math
 
+
+from geometry_msgs.msg import PoseStamped, Pose
+from styx_msgs.msg import Lane
+from scipy.spatial import KDTree
+
+
+
+
 from twist_controller import Controller
 
 '''
@@ -70,6 +78,16 @@ class DBWNode(object):
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
 
+        ''' ********************************** DELETE THIS CODE ONLY FOR DEBUGGING ********************************** '''
+        sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+
+        self.pose = None
+        self.waypoints = None
+        self.waypoints_2d = None
+        self.waypoints_tree = None
+        ''' ********************************** DELETE THIS CODE ONLY FOR DEBUGGING ********************************** '''
+
         self.dbw_enabled = None
         self.current_vel = None
         self.linear_vel = None
@@ -92,10 +110,30 @@ class DBWNode(object):
                                                                                    self.angular_vel)
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
+
+            # closest_wp = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
+            # rospy.logwarn('Cars wp: {}'.format(closest_wp))
             rate.sleep()
 
     def dbw_enabled_cb(self, msg):
         self.dbw_enabled = msg.data
+
+    ''' ********************************** DELETE THIS CODE ONLY FOR DEBUGGING ********************************** '''
+    def pose_cb(self, msg):
+        self.pose = msg
+        # rospy.logwarn(msg)
+
+    def waypoints_cb(self, waypoints):
+        self.waypoints = waypoints
+        if not self.waypoints_2d:
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in
+                                 waypoints.waypoints]
+            self.waypoint_tree = KDTree(self.waypoints_2d)
+
+    def get_closest_waypoint(self, x, y):
+        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
+        return closest_idx
+    ''' ********************************** DELETE THIS CODE ONLY FOR DEBUGGING ********************************** '''
 
     def twist_cmd_cb(self, msg):
         self.linear_vel = msg.twist.linear.x
