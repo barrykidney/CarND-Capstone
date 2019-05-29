@@ -27,7 +27,7 @@ class TLDetector(object):
         self.image_no = 0
         self.image_count = 0
         self.image_increment = 4
-        self.waypoint_range = 150
+        self.waypoint_range = 250
 
         self.pose = None
         self.waypoints = None
@@ -51,8 +51,7 @@ class TLDetector(object):
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
-        # print stopline positions
-        rospy.logwarn(self.config)
+        # rospy.logwarn(self.config)
 
         self.is_site = self.config['is_site']
 
@@ -96,9 +95,9 @@ class TLDetector(object):
 
         if self.image_count % self.image_increment == 0 and self.waypoint_tree and self.light_classifier:
             tl_in_range, tl_idx, car_wp, tl_wp = self.traffic_light_in_range(self.waypoint_range)
-            rospy.logwarn("Car: {},    TL in range: {}".format(car_wp, tl_in_range))
+            rospy.logwarn("Car wp: {},    TL in range: {}".format(car_wp, tl_in_range))
             if tl_in_range:
-                rospy.logwarn("TL:  {}, TL idx: {} in range {} wp".format(tl_wp, tl_idx, self.waypoint_range))
+                rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp".format(tl_wp, tl_idx, self.waypoint_range))
 
         if tl_in_range and self.waypoint_tree:
             self.has_image = True
@@ -132,7 +131,6 @@ class TLDetector(object):
 
         Returns:
             boolean: if a traffic light satisfies these parameters or not
-
         """
 
         offest = 25
@@ -143,14 +141,6 @@ class TLDetector(object):
 
             no_of_wp = len(self.waypoints.waypoints)
             range_to_tl = idx_of_closest_wp_to_car + range_in_waypoints
-
-            # light_idx = 0
-            # for i, light in enumerate(self.lights):
-            #     # rospy.logwarn("light index: {}".format(light_idx))
-            #     line = stop_line_positions[i]
-            #     idx_of_closest_wp_to_line = self.get_closest_waypoint(line[0], line[1])
-            #     # rospy.logwarn("idx_of_closest_wp_to_line: {}".format(idx_of_closest_wp_to_line))
-            #     light_idx += 1
 
             for i, light in enumerate(self.lights):
                 line = stop_line_positions[i]
@@ -188,7 +178,6 @@ class TLDetector(object):
 
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-
         """
 
         if not self.has_image:
