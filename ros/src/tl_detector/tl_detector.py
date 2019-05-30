@@ -28,7 +28,7 @@ class TLDetector(object):
         self.image_no = 0
         self.image_count = 0
         self.image_increment = 4
-        self.waypoint_range = 250
+        self.waypoint_range = 200
 
         self.pose = None
         self.waypoints = None
