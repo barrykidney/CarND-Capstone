@@ -81,10 +81,19 @@ class WaypointUpdater(object):
 
     def generate_lane(self):
         lane = Lane()
+        base_waypoints = []
 
         closest_idx = self.get_closest_waypoint_idx()
-        farthest_idx = (closest_idx + LOOKAHEAD_WPS) % (self.numb_of_wps + 1)
-        base_waypoints = self.base_lane.waypoints[closest_idx:farthest_idx]
+        farthest_idx = closest_idx + LOOKAHEAD_WPS
+
+        # base_waypoints = self.base_lane.waypoints[closest_idx:farthest_idx]
+
+        if farthest_idx < self.numb_of_wps:
+            base_waypoints = self.base_lane.waypoints[closest_idx:farthest_idx]
+        else:
+            first_half_waypoints = self.base_lane.waypoints[closest_idx:self.numb_of_wps-1]
+            second_half_waypoints = self.base_lane.waypoints[0:farthest_idx % (self.numb_of_wps + 1)]
+            base_waypoints = first_half_waypoints + second_half_waypoints
 
         # if stop line is not  detected or if the detected line is outside the range of final waypoints
         if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
