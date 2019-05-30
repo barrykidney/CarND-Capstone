@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import rospy
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
@@ -51,6 +52,7 @@ class TLDetector(object):
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
+        self.stop_line_positions = self.config['stop_line_positions']
         # rospy.logwarn(self.config)
 
         self.is_site = self.config['is_site']
@@ -66,6 +68,10 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.idx_of_closest_wp_to_car = None
+        self.no_of_wp = len(self.waypoints.waypoints)
+        self.line_wp_idxs_list = []
+        self.has_image = False
 
         rospy.spin()
 
@@ -91,36 +97,34 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        tl_in_range = False
 
-        if self.image_count % self.image_increment == 0 and self.waypoint_tree and self.light_classifier:
-            tl_in_range, tl_idx, car_wp, tl_wp = self.traffic_light_in_range(self.waypoint_range)
-            rospy.logwarn("Car wp: {},    TL in range: {}".format(car_wp, tl_in_range))
+        if self.image_count >= self.image_increment and self.waypoint_tree and self.light_classifier:
+            tl_in_range, tl_idx, tl_wp = self.traffic_light_in_range(self.waypoint_range)
+            rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
             if tl_in_range:
                 rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp".format(tl_wp, tl_idx, self.waypoint_range))
 
-        if tl_in_range and self.waypoint_tree:
-            self.has_image = True
-            self.camera_image = msg
-            light_wp, state = self.process_traffic_lights()
-            '''
-            Publish upcoming red lights at camera frequency.
-            Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
-            of times till we start using it. Otherwise the previous stable state is
-            used.
-            '''
-            if self.state != state:
-                self.state_count = 0
-                self.state = state
-            elif self.state_count >= STATE_COUNT_THRESHOLD:
-                self.last_state = self.state
-                light_wp = light_wp if state == TrafficLight.RED else -1
-                self.last_wp = light_wp
-                self.upcoming_red_light_pub.publish(Int32(light_wp))
-            else:
-                self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-            self.state_count += 1
-
+                self.has_image = True
+                self.camera_image = msg
+                light_wp, state = self.process_traffic_lights()
+                '''
+                Publish upcoming red lights at camera frequency.
+                Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
+                of times till we start using it. Otherwise the previous stable state is
+                used.
+                '''
+                if self.state != state:
+                    self.state_count = 0
+                    self.state = state
+                elif self.state_count >= STATE_COUNT_THRESHOLD:
+                    self.last_state = self.state
+                    light_wp = light_wp if state == TrafficLight.RED else -1
+                    self.last_wp = light_wp
+                    self.upcoming_red_light_pub.publish(Int32(light_wp))
+                else:
+                    self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+                self.state_count += 1
+            self.image_count = 0
         self.image_count += 1
 
     def traffic_light_in_range(self, range_in_waypoints):
@@ -133,28 +137,30 @@ class TLDetector(object):
             boolean: if a traffic light satisfies these parameters or not
         """
 
-        offest = 25
-        # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']
-        if self.pose:
-            idx_of_closest_wp_to_car = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
+        offest = 25  # approx offset (in waypoints) from the traffic light and the stop line.
 
-            no_of_wp = len(self.waypoints.waypoints)
-            range_to_tl = idx_of_closest_wp_to_car + range_in_waypoints
+        if self.pose:
+            self.idx_of_closest_wp_to_car = self.get_closest_waypoint(self.pose.pose.position.x,
+                                                                      self.pose.pose.position.y)
+            range_to_tl = self.idx_of_closest_wp_to_car + range_in_waypoints
+
+            if len(self.line_wp_idxs_list) < 1:
+                for i, light in enumerate(self.lights):
+                    line = self.stop_line_positions[i]
+                    self.line_wp_idxs_list.append(self.get_closest_waypoint(line[0], line[1]))
 
             for i, light in enumerate(self.lights):
-                line = stop_line_positions[i]
-                idx_of_closest_wp_to_line = self.get_closest_waypoint(line[0], line[1])
+                idx_of_closest_wp_to_line = self.line_wp_idxs_list[i]
 
-                if range_to_tl < no_of_wp:
-                    if idx_of_closest_wp_to_car <= idx_of_closest_wp_to_line + offest <= range_to_tl % no_of_wp:
-                        return True, i, idx_of_closest_wp_to_car, idx_of_closest_wp_to_line + offest
-                else:
-                    if idx_of_closest_wp_to_car < idx_of_closest_wp_to_line + offest \
-                            or idx_of_closest_wp_to_line + offest < range_to_tl % no_of_wp:
-                        return True, i, idx_of_closest_wp_to_car, idx_of_closest_wp_to_line + offest
+                if range_to_tl < self.no_of_wp:
+                    if self.idx_of_closest_wp_to_car <= idx_of_closest_wp_to_line + offest <= range_to_tl % self.no_of_wp:
+                        return True, i, idx_of_closest_wp_to_line + offest
+                else:  # if car position + range extends past the max wp and wraps back around to wp 0, 1, 2, etc.
+                    if self.idx_of_closest_wp_to_car < idx_of_closest_wp_to_line + offest \
+                            or idx_of_closest_wp_to_line + offest < range_to_tl % self.no_of_wp:
+                        return True, i, idx_of_closest_wp_to_line + offest
 
-            return False, -1, idx_of_closest_wp_to_car, -1
+            return False, -1, -1
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
@@ -224,21 +230,16 @@ class TLDetector(object):
         closest_light = None
         line_wp_idx = None
 
-        # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']
         if (self.pose):
-            idx_of_closest_wp_to_car = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
-
-            diff = len(self.waypoints.waypoints)
+            diff = self.no_of_wp
             for i, light in enumerate(self.lights):
-                line = stop_line_positions[i]
-                current_wp_idx = self.get_closest_waypoint(line[0], line[1])
+                idx_of_closest_wp_to_line = self.line_wp_idxs_list[i]
 
-                d = current_wp_idx - idx_of_closest_wp_to_car
+                d = idx_of_closest_wp_to_line - self.idx_of_closest_wp_to_car
                 if d >= 0 and d < diff:
                     diff = d
                     closest_light = light
-                    line_wp_idx = current_wp_idx
+                    line_wp_idx = idx_of_closest_wp_to_line
 
         if closest_light:
             state = self.get_light_state(closest_light)
