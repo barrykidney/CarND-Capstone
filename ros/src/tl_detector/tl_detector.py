@@ -37,8 +37,8 @@ class TLDetector(object):
         self.camera_image = None
         self.lights = []
 
-        sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         '''
         /vehicle/traffic_lights provides you with the location of the traffic light in 3D map space and
@@ -47,8 +47,8 @@ class TLDetector(object):
         simulator. When testing on the vehicle, the color state will not be available. You'll need to
         rely on the position of the light and the camera image to predict it.
         '''
-        sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
+        rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
+        rospy.Subscriber('/image_color', Image, self.image_cb)
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -83,7 +83,7 @@ class TLDetector(object):
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in
                                  waypoints.waypoints]
-            self.waypoint_tree = KDTree(self.waypoints_2d)
+            self.waypoints_tree = KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -98,7 +98,7 @@ class TLDetector(object):
 
         """
 
-        if self.image_count >= self.image_increment and self.waypoint_tree and self.light_classifier:
+        if self.image_count >= self.image_increment and self.waypoints_tree and self.light_classifier:
             tl_in_range, tl_idx, tl_wp = self.traffic_light_in_range(self.waypoint_range)
             rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
             if tl_in_range:
@@ -153,7 +153,8 @@ class TLDetector(object):
                 idx_of_closest_wp_to_line = self.line_wp_idxs_list[i]
 
                 if range_to_tl < self.no_of_wp:
-                    if self.idx_of_closest_wp_to_car <= idx_of_closest_wp_to_line + offest <= range_to_tl % self.no_of_wp:
+                    if self.idx_of_closest_wp_to_car <= idx_of_closest_wp_to_line + offest \
+                            <= range_to_tl % self.no_of_wp:
                         return True, i, idx_of_closest_wp_to_line + offest
                 else:  # if car position + range extends past the max wp and wraps back around to wp 0, 1, 2, etc.
                     if self.idx_of_closest_wp_to_car < idx_of_closest_wp_to_line + offest \
@@ -166,14 +167,15 @@ class TLDetector(object):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
-            pose (Pose): position to match a waypoint to
+            x (float): position to match a waypoint to
+            y (float): position to match a waypoint to
 
         Returns:
             int: index of the closest waypoint in self.waypoints
 
         """
-        # TODO implement
-        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
+
+        closest_idx = self.waypoints_tree.query([x, y], 1)[1]
         return closest_idx
 
     def get_light_state(self, light):
@@ -230,20 +232,19 @@ class TLDetector(object):
         closest_light = None
         line_wp_idx = None
 
-        if (self.pose):
+        if self.pose:
             diff = self.no_of_wp
             for i, light in enumerate(self.lights):
                 idx_of_closest_wp_to_line = self.line_wp_idxs_list[i]
 
                 d = idx_of_closest_wp_to_line - self.idx_of_closest_wp_to_car
-                if d >= 0 and d < diff:
+                if diff > d >= 0:
                     diff = d
                     closest_light = light
                     line_wp_idx = idx_of_closest_wp_to_line
 
         if closest_light:
-            state = self.get_light_state(closest_light)
-            return line_wp_idx, state
+            return line_wp_idx, self.get_light_state(closest_light)
 
         return -1, TrafficLight.UNKNOWN
 
