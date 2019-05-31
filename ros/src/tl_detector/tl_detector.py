@@ -27,7 +27,7 @@ class TLDetector(object):
         self.use_classifier = True  # use the traffic light detection
         self.image_no = 0
         self.image_count = 0
-        self.image_increment = 4
+        self.image_increment = 3
         self.waypoint_range = 200
 
         self.pose = None
@@ -36,6 +36,8 @@ class TLDetector(object):
         self.waypoints_tree = None
         self.camera_image = None
         self.lights = []
+
+        self.light_classifier = TLClassifier(self.safe_visualizations)
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -62,14 +64,12 @@ class TLDetector(object):
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier(self.safe_visualizations)
         self.listener = tf.TransformListener()
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
         self.idx_of_closest_wp_to_car = None
-        self.no_of_wp = len(self.waypoints.waypoints)
         self.line_wp_idxs_list = []
         self.has_image = False
 
@@ -80,6 +80,7 @@ class TLDetector(object):
 
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints
+        self.no_of_wp = len(self.waypoints.waypoints)
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in
                                  waypoints.waypoints]
