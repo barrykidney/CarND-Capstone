@@ -135,8 +135,6 @@ class TLDetector(object):
     def traffic_light_in_range(self):
         """Identifies if the closest traffic light to the vehicles position
             is within a given number of waypoints ahead of the vehicle.
-        Args:
-            range_in_waypoints (int): the max number of waypoints
 
         Returns:
             boolean: if a traffic light satisfies these parameters or not
@@ -152,9 +150,11 @@ class TLDetector(object):
                     line = self.stop_line_positions[i]
                     self.line_wp_idxs_list.append(self.get_closest_waypoint(line[0], line[1]))
 
-            if self.idx_of_closest_wp_to_car > self.line_wp_idxs_list[self.current_tl_wp_idx]:
+            if self.idx_of_closest_wp_to_car \
+                    > self.line_wp_idxs_list[self.current_tl_wp_idx % len(self.line_wp_idxs_list)]:
                 self.current_tl_wp_idx += 1
-            if self.idx_of_closest_wp_to_car + self.waypoint_range > self.line_wp_idxs_list[self.current_tl_wp_idx] + offest:
+            if self.idx_of_closest_wp_to_car + self.waypoint_range \
+                    > self.line_wp_idxs_list[self.current_tl_wp_idx % len(self.line_wp_idxs_list)] + offest:
                 return True
             else:
                 return False
