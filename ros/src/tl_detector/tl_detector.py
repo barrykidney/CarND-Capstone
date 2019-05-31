@@ -29,6 +29,7 @@ class TLDetector(object):
         self.image_count = 0
         self.image_increment = 3
         self.waypoint_range = 200
+        self.current_tl_wp_idx = 0
 
         self.pose = None
         self.waypoints = None
@@ -69,6 +70,7 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.no_of_wp = None
         self.idx_of_closest_wp_to_car = None
         self.line_wp_idxs_list = []
         self.has_image = False
@@ -100,11 +102,13 @@ class TLDetector(object):
         """
 
         if self.image_count >= self.image_increment and self.waypoints_tree and self.light_classifier:
-            tl_in_range, tl_idx, tl_wp = self.traffic_light_in_range(self.waypoint_range)
+            tl_in_range = self.traffic_light_in_range()
             rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
             if tl_in_range:
-                rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp".format(tl_wp, tl_idx, self.waypoint_range))
-
+                rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp"
+                              .format(self.line_wp_idxs_list[self.current_tl_wp_idx],
+                                      self.current_tl_wp_idx,
+                                      self.waypoint_range))
                 self.has_image = True
                 self.camera_image = msg
                 light_wp, state = self.process_traffic_lights()
@@ -128,7 +132,7 @@ class TLDetector(object):
             self.image_count = 0
         self.image_count += 1
 
-    def traffic_light_in_range(self, range_in_waypoints):
+    def traffic_light_in_range(self):
         """Identifies if the closest traffic light to the vehicles position
             is within a given number of waypoints ahead of the vehicle.
         Args:
@@ -143,26 +147,17 @@ class TLDetector(object):
         if self.pose:
             self.idx_of_closest_wp_to_car = self.get_closest_waypoint(self.pose.pose.position.x,
                                                                       self.pose.pose.position.y)
-            range_to_tl = self.idx_of_closest_wp_to_car + range_in_waypoints
-
             if len(self.line_wp_idxs_list) < 1:
                 for i, light in enumerate(self.lights):
                     line = self.stop_line_positions[i]
                     self.line_wp_idxs_list.append(self.get_closest_waypoint(line[0], line[1]))
 
-            for i, light in enumerate(self.lights):
-                idx_of_closest_wp_to_line = self.line_wp_idxs_list[i]
-
-                if range_to_tl < self.no_of_wp:
-                    if self.idx_of_closest_wp_to_car <= idx_of_closest_wp_to_line + offest \
-                            <= range_to_tl % self.no_of_wp:
-                        return True, i, idx_of_closest_wp_to_line + offest
-                else:  # if car position + range extends past the max wp and wraps back around to wp 0, 1, 2, etc.
-                    if self.idx_of_closest_wp_to_car < idx_of_closest_wp_to_line + offest \
-                            or idx_of_closest_wp_to_line + offest < range_to_tl % self.no_of_wp:
-                        return True, i, idx_of_closest_wp_to_line + offest
-
-            return False, -1, -1
+            if self.idx_of_closest_wp_to_car > self.line_wp_idxs_list[self.current_tl_wp_idx]:
+                self.current_tl_wp_idx += 1
+            if self.idx_of_closest_wp_to_car + self.waypoint_range > self.line_wp_idxs_list[self.current_tl_wp_idx] + offest:
+                return True
+            else:
+                return False
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
