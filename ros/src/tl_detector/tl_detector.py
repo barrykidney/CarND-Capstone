@@ -106,7 +106,7 @@ class TLDetector(object):
             rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
             if tl_in_range:
                 rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp"
-                              .format(self.line_wp_idxs_list[self.current_tl_wp_idx],
+                              .format(self.line_wp_idxs_list[self.current_tl_wp_idx % len(self.line_wp_idxs_list)],
                                       self.current_tl_wp_idx,
                                       self.waypoint_range))
                 self.has_image = True
