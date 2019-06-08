@@ -22,7 +22,7 @@ class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
 
-        self.safe_visualizations = True  # saves camera images with detected bounding boxes
+        self.safe_visualizations = False  # saves camera images with detected bounding boxes
         self.use_classifier = True  # use the traffic light detection
         self.image_count = 0
         self.image_increment = 2
