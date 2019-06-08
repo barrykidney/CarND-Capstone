@@ -10,12 +10,12 @@ class ImageSaver(object):
         self.category_index = category_index
         self.output_dir = output_dir
 
-    def save_visualization(self, image, boxes, classes, scores, max_state):
+    def save_visualization(self, image, boxes, classes, scores):
         timestamp = calendar.timegm(time.gmtime())
-        output_dir = os.path.join(self.output_dir, 'camera', max_state)
+        output_dir = os.path.join(self.output_dir, 'camera')
         self._save_image(image, timestamp, output_dir)
         visualized_image = self._visualize_detections(image, boxes, classes, scores)
-        output_dir = os.path.join(self.output_dir, 'visualization', max_state)
+        output_dir = os.path.join(self.output_dir, 'visualization')
         self._save_image(visualized_image, timestamp, output_dir)
 
     def _visualize_detections(self, image, boxes, classes, scores):
