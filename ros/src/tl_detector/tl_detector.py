@@ -22,12 +22,10 @@ class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
 
-        self.create_dataset = False  # only to create datasets from the simulator
-        self.safe_visualizations = False  # saves camera images with detected bounding boxes
+        self.safe_visualizations = True  # saves camera images with detected bounding boxes
         self.use_classifier = True  # use the traffic light detection
-        self.image_no = 0
         self.image_count = 0
-        self.image_increment = 3
+        self.image_increment = 2
         self.waypoint_range = 200
         self.current_tl_wp_idx = 0
 
@@ -187,12 +185,7 @@ class TLDetector(object):
         if not self.has_image:
             return False
 
-        if self.create_dataset and self.image_no % 15 == 0:
-            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, 'rgb8')
-            self.image_saver.save_image(cv_image, self.state_to_string(light.state))
-        self.image_no += 1
-
-        if not self.use_classifier or self.create_dataset:
+        if not self.use_classifier:
             rospy.loginfo('Light state: %s', light.state)
             return light.state
 

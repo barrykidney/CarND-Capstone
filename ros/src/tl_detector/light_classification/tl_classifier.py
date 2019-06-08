@@ -15,21 +15,17 @@ class TLClassifier(object):
         config_string = rospy.get_param("/traffic_light_config")
 
         config = yaml.safe_load(config_string)
-        is_site = config['is_site']
 
-        #
-        self.MIN_SCORE_THRESHOLD = 0.50
-
-        # saves to every original image from the camera an image annotated with the detected traffic lights
+        # saves to every original image from the camera and image annotated with the detected traffic lights
         # only needed to check how good the traffic light detection works
         self.save_visualizations = save_visualizations
-
-        output_dir = './data'
 
         # directory in which the trained models are stored
         model_dir = os.path.dirname(os.path.realpath(__file__))
 
         # load site or simulator model dependent on the site configuration
+        output_dir = './data'
+        is_site = config['is_site']
         if is_site:
             model_file_path = os.path.join(model_dir, 'ud_capstone_site_graph.pb')
             rospy.loginfo("Site environment: {}".format(model_file_path))
@@ -81,43 +77,21 @@ class TLClassifier(object):
         # rospy.loginfo("boxes: {}".format(boxes))
         # rospy.loginfo("scores: {}".format(scores))
 
-        normalized_scores = {"Green": 0, "Red": 0, "Yellow": 0, "Unknown": 0}
+        boxes = np.squeeze(boxes)
+        scores = np.squeeze(scores)
+        classes = np.squeeze(classes).astype(np.int32)
 
-        det_count = 0
-        det_indexes = []
-
-        for i in range(0, num_detections):
-            if scores is not None:
-                score = scores[0][i]
-                if score > self.MIN_SCORE_THRESHOLD:
-                    det_state = classes[0][i]
-                    det_name = self.category_index[det_state]['name']
-                    normalized_scores[det_name] += score
-                    det_indexes.append(i)
-                    det_count += 1
-
-        if det_count > 0:
-            boxes = np.array(boxes[0][det_indexes])
-            scores = np.array(scores[0][det_indexes])
-            classes = np.squeeze(np.array(classes[0][det_indexes])).astype(int)
-
-        max_score = 0
         max_state = "Unknown"
-        for key in normalized_scores.keys():
-            # Normalize scores
-            if det_count > 0:
-                normalized_scores[key] /= (det_count * 1.0)
-            # Get highest score
-            if normalized_scores[key] > max_score:
-                max_score = normalized_scores[key]
-                max_state = key
+        max_score = -1
+        if len(scores) > 0:
+            max_score = scores[0]
+            max_state = self.category_index[classes[0]]['name']
 
-        rospy.loginfo(normalized_scores)
         rospy.loginfo("Predicted state: {} ({})".format(max_state, max_score))
 
         # save visualized image if the option is set
-        if self.save_visualizations and det_count > 0:
-            self.image_saver.save_visualization(image, boxes, classes, scores, max_state)
+        if self.save_visualizations:
+            self.image_saver.save_visualization(image, boxes, classes, scores)
 
         return max_state
 
