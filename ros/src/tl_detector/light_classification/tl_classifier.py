@@ -23,16 +23,16 @@ class TLClassifier(object):
         # directory in which the trained models are stored
         model_dir = os.path.dirname(os.path.realpath(__file__))
 
-        # load site or simulator model dependent on the site configuration
+        # load tl-detection model
+        model_file_path = os.path.join(model_dir, 'tl-detection-model.pb')
+        rospy.loginfo("Detection model {} loaded.".format(model_file_path))
+
+        # output directory for image saver
         output_dir = './data'
         is_site = config['is_site']
         if is_site:
-            model_file_path = os.path.join(model_dir, 'ud_capstone_site_graph.pb')
-            rospy.loginfo("Site environment: {}".format(model_file_path))
             output_dir = os.path.join(output_dir, 'site')
         else:
-            model_file_path = os.path.join(model_dir, 'ud_capstone_simulator_graph.pb')
-            rospy.loginfo("Simulator environment: {}".format(model_file_path))
             output_dir = os.path.join(output_dir, 'simulator')
 
         # Load Tensorflow model graph

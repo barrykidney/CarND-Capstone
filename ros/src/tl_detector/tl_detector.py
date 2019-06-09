@@ -24,8 +24,6 @@ class TLDetector(object):
 
         self.safe_visualizations = False  # saves camera images with detected bounding boxes
         self.use_classifier = True  # use the traffic light detection
-        self.image_count = 0
-        self.image_increment = 2
         self.waypoint_range = 200
         self.current_tl_wp_idx = 0
 
@@ -99,7 +97,7 @@ class TLDetector(object):
 
         """
 
-        if self.image_count >= self.image_increment and self.waypoints_tree and self.light_classifier:
+        if self.waypoints_tree and self.light_classifier:
             tl_in_range = self.traffic_light_in_range()
             rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
             if tl_in_range:
@@ -127,8 +125,6 @@ class TLDetector(object):
                 else:
                     self.upcoming_red_light_pub.publish(Int32(self.last_wp))
                 self.state_count += 1
-            self.image_count = 0
-        self.image_count += 1
 
     def traffic_light_in_range(self):
         """Identifies if the closest traffic light to the vehicles position
