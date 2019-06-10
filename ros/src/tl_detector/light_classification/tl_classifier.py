@@ -83,7 +83,7 @@ class TLClassifier(object):
 
         max_state = "Unknown"
         max_score = -1
-        if len(scores) > 0:
+        if len(scores) > 0 and scores[0] > 0.1:
             max_score = scores[0]
             max_state = self.category_index[classes[0]]['name']
 
