@@ -100,6 +100,7 @@ class TLDetector(object):
         if self.is_site:
             self.has_image = True
             self.camera_image = msg
+            tl_in_range = self.traffic_light_in_range()
             light_wp, state = self.process_traffic_lights()
 
             '''
@@ -236,11 +237,38 @@ class TLDetector(object):
         Returns:
             int: index of waypoint closes to the upcoming stop line for a traffic light (-1 if none exists)
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-
         """
+
         closest_light = None
         line_wp_idx = None
 
+        # if self.is_site:
+        #
+        #     rospy.logwarn(self.lights)
+        #     # rospy.logwarn(not self.pose)
+        #
+        #     if self.pose:
+        #         rospy.logwarn('Pose')
+        #         # diff = self.no_of_wp
+        #         # rospy.logwarn(self.no_of_wp)
+        #         rospy.logwarn(self.line_wp_idxs_list)
+        #
+        #         # for i, light in enumerate(self.lights):
+        #         #     idx_of_closest_wp_to_line = self.line_wp_idxs_list[i]
+        #
+        #         rospy.logwarn('')
+        #         rospy.logwarn('')
+        #
+        # #         diff = self.no_of_wp
+        # #         idx_of_closest_wp_to_line = 0
+        # #
+        # #         d = idx_of_closest_wp_to_line - self.idx_of_closest_wp_to_car
+        # #         if diff > d >= 0:
+        # #             diff = d
+        # #             line_wp_idx = idx_of_closest_wp_to_line
+        # #     # return line_wp_idx, self.get_light_state(closest_light)
+        # #
+        # # else:
         if self.pose:
             diff = self.no_of_wp
             for i, light in enumerate(self.lights):
@@ -253,8 +281,9 @@ class TLDetector(object):
                     line_wp_idx = idx_of_closest_wp_to_line
 
         if closest_light:
+            rospy.logdebug('TL found ************')
             return line_wp_idx, self.get_light_state(closest_light)
-
+        rospy.logdebug('TL not found')
         return -1, TrafficLight.UNKNOWN
 
 
