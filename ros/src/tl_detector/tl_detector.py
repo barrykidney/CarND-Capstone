@@ -97,34 +97,59 @@ class TLDetector(object):
 
         """
 
-        if self.waypoints_tree and self.light_classifier:
+        if self.is_site:
+            self.has_image = True
+            self.camera_image = msg
             tl_in_range = self.traffic_light_in_range()
-            rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
-            if tl_in_range:
-                rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp"
-                              .format(self.line_wp_idxs_list[self.current_tl_wp_idx % len(self.line_wp_idxs_list)],
-                                      self.current_tl_wp_idx,
-                                      self.waypoint_range))
-                self.has_image = True
-                self.camera_image = msg
-                light_wp, state = self.process_traffic_lights()
-                '''
-                Publish upcoming red lights at camera frequency.
-                Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
-                of times till we start using it. Otherwise the previous stable state is
-                used.
-                '''
-                if self.state != state:
-                    self.state_count = 0
-                    self.state = state
-                elif self.state_count >= STATE_COUNT_THRESHOLD:
-                    self.last_state = self.state
-                    light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
-                    self.last_wp = light_wp
-                    self.upcoming_red_light_pub.publish(Int32(light_wp))
-                else:
-                    self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-                self.state_count += 1
+            light_wp, state = self.process_traffic_lights()
+
+            '''
+            Publish upcoming red lights at camera frequency.
+            Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
+            of times till we start using it. Otherwise the previous stable state is
+            used.
+            '''
+            if self.state != state:
+                self.state_count = 0
+                self.state = state
+            elif self.state_count >= STATE_COUNT_THRESHOLD:
+                self.last_state = self.state
+                light_wp = light_wp if state == TrafficLight.RED else -1
+                self.last_wp = light_wp
+                self.upcoming_red_light_pub.publish(Int32(light_wp))
+            else:
+                self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+            self.state_count += 1
+
+        else:
+            if self.waypoints_tree and self.light_classifier:
+                tl_in_range = self.traffic_light_in_range()
+                rospy.logwarn("Car wp: {},    TL in range: {}".format(self.idx_of_closest_wp_to_car, tl_in_range))
+                if tl_in_range:
+                    rospy.logwarn("TL wp:  {}, TL idx: {} in range {} wp"
+                                  .format(self.line_wp_idxs_list[self.current_tl_wp_idx % len(self.line_wp_idxs_list)],
+                                          self.current_tl_wp_idx,
+                                          self.waypoint_range))
+                    self.has_image = True
+                    self.camera_image = msg
+                    light_wp, state = self.process_traffic_lights()
+                    '''
+                    Publish upcoming red lights at camera frequency.
+                    Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
+                    of times till we start using it. Otherwise the previous stable state is
+                    used.
+                    '''
+                    if self.state != state:
+                        self.state_count = 0
+                        self.state = state
+                    elif self.state_count >= STATE_COUNT_THRESHOLD:
+                        self.last_state = self.state
+                        light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
+                        self.last_wp = light_wp
+                        self.upcoming_red_light_pub.publish(Int32(light_wp))
+                    else:
+                        self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+                    self.state_count += 1
 
     def traffic_light_in_range(self):
         """Identifies if the closest traffic light to the vehicles position
@@ -212,8 +237,8 @@ class TLDetector(object):
         Returns:
             int: index of waypoint closes to the upcoming stop line for a traffic light (-1 if none exists)
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-
         """
+
         closest_light = None
         line_wp_idx = None
 
